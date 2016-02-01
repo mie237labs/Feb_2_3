@@ -1,0 +1,147 @@
+---
+title: "MIE237 February 2-3 Labs"
+author: "Neil Montgomery"
+date: "February 1, 2016"
+output: pdf_document
+---
+
+```{r echo=FALSE, message=FALSE}
+# The libraries I'll need.
+library(rio)
+library(dplyr)
+library(knitr)
+library(ggplot2)
+```
+
+# Summary of you will do in this lab
+
+You'll do some questions for tests of independence, and a little bit of regression (much more later).
+
+1. Using the real data file formats I've provided, analyze the scenarios presented in 10.86, 10.87, and 10.89. (I work out 10.88 for you.)
+
+2. Do 11.1(a), to start learning how to do regression analyses. (I've reproduced 11.5 that we used in class.) You can do the basic analysis for any of the textbook questions on pages 398 to 400. 
+
+# The usual advice
+
+I've told you where to get the textbook data. I've fixed a few files, you might want to get those updates from the repository. The PDF of this lab doesn't show all the code, but the `.Rmd` source file of the lab does. Data analysis consists of some graphical and/or numerical exploration, the analysis itself, a verification of assumptions, and a conclusion/interpretation.
+
+## Test of independence worked example
+
+We'll look at 10.88 from the book. The relevant file is `Ex10.88.txt`.
+
+### Comments on textbook data files
+
+The files given for section 10.12 questions are not actual datasets, in the sense that they are not rows of records with columns of variables. It is possible to use the `chisq.test` function in R but it is a bit artificial.
+
+More importantly this presents a problem when trying to make nice plots---`ggplot2` expects datasets and not toy examples---and even things like adding marginal totals to tables. So what I've done is create files that look like actual datasets for the questions to do in this lab.
+
+(And the files for exercises 10.86 and 10.87 are hopelessly mangled so I've also provided a fixed versions here.)
+
+### 10.88
+
+I'll show you how to work with the summary table first.
+
+```{r}
+# I've used read.delim rather than import because we need R to know that the
+# first column is actually row names and not a variable.
+men_table <- read.delim("Ex10.88.txt", row.names = 1)
+```
+
+There's no good way to make plots from a summary table, so we'll put that off for a moment. Here's a nice view of the table and the actual $\chi^2$ results. 
+```{r}
+kable(men_table)
+(men_table_chisq <- chisq.test(men_table))
+```
+
+We can access the results directly and print nice things in the text like: *the observed value of the test statistic is $`r men_table_chisq$statistic`$ and the p-value is $`r men_table_chisq$p.value`$*. We can also access the expected cell counts like this:
+
+```{r}
+kable(men_table_chisq$expected)
+```
+
+All of them well over 5, so the $\chi^2$ approximation is good enough.
+
+But that's about it with the file as in table form already. But at least with this you can check your hand calculations when you try exercises. Let's move on to the proper way, with actual data.
+
+```{r}
+men <- import("Ex10.88.csv")
+```
+
+From now on much of the R code is in the lab source file and not printed in this document.
+
+Here is a plot of the data that is nice for visualizing independence.
+
+```{r, echo=FALSE}
+men %>% 
+  ggplot(aes(x=Education)) + 
+  geom_bar(aes(fill = `Number of Children`), position = "fill")
+```
+
+Hmmm...the `Education` variable levels are in alphabetical order rather than the order as in the text. No worries...
+
+```{r}
+men$Education <- factor(men$Education, 
+                        levels=c("Elementary", "Secondary", "College"))
+men %>% 
+  ggplot(aes(x=Education)) + 
+  geom_bar(aes(fill = `Number of Children`), position = "fill")
+```
+
+Here is the table of counts along with marginal totals.
+
+```{r, echo=FALSE}
+kable(addmargins(table(men$Education, men$`Number of Children`)))
+```
+
+Here are the $\chi^2$ test results, which are of course the same as before. 
+
+```{r}
+chisq.test(men$Education, men$`Number of Children`)
+```
+
+## Simple regression basics worked example (11.5)
+
+A regression analysis starts with data import (and in real life---data cleaning), plotting the data, analysis, and verification of model assumptions. We'll just do plotting and a little analysis this week.
+
+We re-do the sugar/temperature example from class (11.5). Import and plot the data.
+
+```{r}
+sugar <- import("Ex11.05.txt")
+sugar %>% 
+  ggplot(aes(x=Temperature, y=`Coverted-sugar`)) + geom_point()
+```
+
+Boy that spelling mistake is annoying. Here's how you would fix it. This code isn't run, so the spelling mistake will persist in this document. In real life I would have done this first.
+
+```{r, eval=FALSE}
+# NOT RUN
+names(sugar)[2] <- "Converted-sugar"
+```
+
+Let's go ahead with the regression analysis. The function is `lm`. Here are a few ways to use it. I usually use the second, so I commented out the first.
+
+```{r}
+# lm(`Coverted-sugar` ~ Temperature, data = sugar)
+
+sugar %>% 
+  lm(`Coverted-sugar` ~ Temperature, data = .)
+```
+
+It doesn't print much of use. The two common commands used to print useful summaries are `summary` and `anova` (the latter of which we'll get to this week in detail in class.)
+
+```{r}
+sugar %>% 
+  lm(`Coverted-sugar` ~ Temperature, data = .) -> sugar_lm
+
+(sugar_lm_summary <- summary(sugar_lm))
+anova(sugar_lm)
+```
+
+The `sugar_lm` and `sugar_lm_summary` objects have many components that we will define and access, some honestly more easy to get to than others, such as:
+
+```{r}
+sugar_lm$coefficients
+# The p-value
+sugar_lm_summary$coefficients[2,4]
+```
+
